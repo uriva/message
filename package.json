@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "await-timeout": "^0.2.0"
+    "await-timeout": "^0.2.0",
+    "random-port": "^0.1.0"
   }
 }
