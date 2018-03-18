@@ -1,6 +1,8 @@
 const Timeout = require('await-timeout');
 const utils = require('./utils');
 const constants = require('./constants');
+const client = require('./client');
+const server = require('./server');
 
 exports.Node = class {
   // All param are strings.
@@ -11,6 +13,21 @@ exports.Node = class {
     this._publicKeyToIps = bootstrapIpMap;
     // Maps string to array of callbacks.
     this._messageTypeToSubscribe = {};
+    // Listen on incoming connections.
+    server.createServer(data => {
+      const message = JSON.parse(data.toString());
+      if (message.type == constants.SEARCH_PEER) {
+        c.write(
+          JSON.stringify({
+            type: constants.UPDATE_PEERS,
+            peersMap: peers.idToIp
+          })
+        );
+      }
+      for (cb of this._messageTypeToSubscribe[message.type]) {
+        cb(message);
+      }
+    });
   }
 
   // Returns a promise of true/false if the message passed through.
