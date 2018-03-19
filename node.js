@@ -126,6 +126,7 @@ exports.Node = class {
       delete this._publicKeyToSocket[publicKey];
     });
     this._publicKeyToSocket[publicKey] = socket;
+    this._publicKeyToIps[publicKey] = socket.address().address;
     socket.on('data', data => {
       const message = JSON.parse(data);
       console.log('received data on the wire', message);
