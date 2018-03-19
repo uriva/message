@@ -14,6 +14,7 @@ exports.Node = class {
     this._messageTypeToSubscribe[constants.SEARCH_PEER] = [
       ({ publicKey, message }) => {
         const searchedKey = message.payload.searchedKey;
+        console.log('got search peer request', publicKey, searchedKey);
         if (searchedKey in self._publicKeyToIps) {
           const payload = {};
           payload[searchedKey] = self._publicKeyToIps[searchedKey];
@@ -23,6 +24,13 @@ exports.Node = class {
             payload
           });
         }
+      }
+    ];
+    this._messageTypeToSubscribe[constants.UPDATE_PEERS] = [
+      ({ publicKey, message }) => {
+        const peersToUpdate = message.payload;
+        console.log('got update peers', publicKey, payload);
+        this._publicKeyToIps.extend(peersToUpdate);
       }
     ];
     this._createServer();
