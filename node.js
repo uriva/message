@@ -1,6 +1,12 @@
 const net = require('net');
 const Timeout = require('await-timeout');
-const constants = { PORT: 9876, GET_IP: 'GET_IP', IDENTIFY: 'IDENTIFY' };
+const constants = {
+  PORT: 9876,
+  GET_IP: 'GET_IP',
+  IDENTIFY: 'IDENTIFY',
+  UPDATE_PEERS: 'UPDATE_PEERS',
+  SEARCH_PEER: 'SEARCH_PEER'
+};
 
 exports.Node = class {
   // All param are strings.
@@ -129,23 +135,22 @@ exports.Node = class {
     });
   }
 
-  // Triggers a search for a public key's IP.
+  // Triggers a search for a public key's IP, starting with the closest peer.
   _getIp({ publicKey }) {
-    const peers = [this._publicKey, ...Object.keys(this._publicKeyToIps)];
+    const peers = [...Object.keys(this._publicKeyToIps)];
+    if (!peers.length) {
+      console.error('No peers to query.');
+      return;
+    }
     const distances = peers.map(
       distanceBetweenPublicKeys.bind(null, publicKey)
     );
-    // Upon a cache miss, query the closest peer for the missing IP.
     const minPeer = peers[distances.indexOf(Math.min(...distances))];
-    if (!minPeer || minPeer == this._publicKey) {
-      console.error('No better peers to query.');
-      return;
-    }
     this.sendMessage(
       {
         recipient: minPeer,
-        type: constants.GET_IP,
-        payload: publicKey
+        type: constants.SEARCH_PEER,
+        payload: { searchedKey: publicKey }
       },
       0,
       0
