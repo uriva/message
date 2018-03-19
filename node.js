@@ -73,11 +73,13 @@ exports.Node = class {
 
   // Returns a socket for given recipient.
   async _getSocket({ recipient }) {
-    console.log('getting socket');
+    console.log('getting socket', recipient);
     if (this._publicKeyToSocket[recipient]) {
       return this._publicKeyToSocket[recipient];
     }
+    console.log('current ips', this._publicKeyToIps);
     if (!this._publicKeyToIps[recipient]) {
+      console.log(recipient, this._publicKeyToIps);
       return Promise.reject('No active socket and no IP.');
     }
     try {
@@ -95,13 +97,15 @@ exports.Node = class {
   }
 
   async _createVerifiedSocket({ recipient, ip }) {
+    console.log('creating verified socket', recipient, ip);
     try {
       // In the happy flow we have a good IP and connect.
       const socket = await connectToPeer({ ip });
     } catch (e) {
+      console.error(e);
       return Promise.reject(`Could not create socket to ip. (${e})`);
     }
-    return Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       socket.on('data', data => {
         if (this._onSocketInitialData(data)) {
           resolve();
@@ -151,6 +155,7 @@ exports.Node = class {
 
   _onSocketInitialData(data) {
     const message = JSON.parse(data);
+    console.log('got initial data on socket', message);
     if (
       message.type == constants.IDENTIFY &&
       verifySignature({
@@ -166,6 +171,7 @@ exports.Node = class {
 
   _createServer() {
     const server = net.createServer(c => {
+      console.log('client has connected, sending credentials');
       // Send the client our identity.
       c.write(
         toMessage({
@@ -178,8 +184,11 @@ exports.Node = class {
       );
       c.on('data', this._onSocketInitialData.bind(this));
     });
+    server.on('error', err => {
+      throw err;
+    });
     server.listen(constants.PORT, () => {
-      console.log(`server listening on ${JSON.stringify(server.address())}`);
+      console.log(`server bound`);
     });
   }
 
@@ -195,8 +204,10 @@ const distanceBetweenPublicKeys = function({ k1, k2 }) {
 };
 
 const connectToPeer = function({ ip }) {
-  return Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    console.log('setting up socket', ip);
     const socket = net.connect(constants.PORT, ip, () => {
+      console.log('connection successful', ip);
       resolve(socket);
     });
   });

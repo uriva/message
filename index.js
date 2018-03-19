@@ -3,9 +3,11 @@ const nodeLib = require('./node');
 const node = new nodeLib.Node({
   publicKey: args[0],
   privateKey: args[1],
-  bootstrapIpMap: {}
+  bootstrapIpMap: { '1': 'localhost' }
 });
-node
-  .sendMessage({ recipient: 1, type: 'bla', payload: 'hello' }, 3, 1000)
-  .then(console.log)
-  .catch(console.log);
+setTimeout(() => {
+  node
+    .sendMessage({ recipient: 1, type: 'bla', payload: 'hello' }, 3, 1000)
+    .then(console.log)
+    .catch(console.log);
+}, 2000);
