@@ -1,6 +1,6 @@
 const net = require('net');
 const Timeout = require('await-timeout');
-const constants = require('./constants');
+const constants = { PORT: 9876, GET_IP: 'GET_IP', IDENTIFY: 'IDENTIFY' };
 
 exports.Node = class {
   // All param are strings.
@@ -47,13 +47,12 @@ exports.Node = class {
       const socket = await this._getSocket({ recipient });
       return socket.write(toMessage({ type, payload }));
     } catch (e) {
+      console.error(e);
       if (!retriesLeft) {
-        return Promise.reject(
-          `Could not create a socket for recipient (${e}).`
-        );
+        return Promise.reject(`Could not create a socket for recipient.`);
       }
       retriesLeft--;
-      this._getIp({ recipient });
+      this._getIp({ publicKey: recipient });
       const timeout = new Timeout();
       await timeout.set(waitBetweenRetries);
       return this.sendMessage(
@@ -74,41 +73,39 @@ exports.Node = class {
   // Returns a socket for given recipient.
   async _getSocket({ recipient }) {
     console.log('getting socket', recipient);
-    if (this._publicKeyToSocket[recipient]) {
+    if (recipient in this._publicKeyToSocket) {
       return this._publicKeyToSocket[recipient];
     }
     console.log('current ips', this._publicKeyToIps);
     if (!this._publicKeyToIps[recipient]) {
-      console.log(recipient, this._publicKeyToIps);
       return Promise.reject('No active socket and no IP.');
     }
     try {
-      await this._createVerifiedSocket({
+      return await this._createVerifiedSocket({
         recipient,
         ip: this._publicKeyToIps[recipient]
       });
-      return this._publicKeyToSocket[recipient];
     } catch (e) {
       delete this._publicKeyToIps[recipient];
-      return Promise.reject(
-        `Could not create verified socket, removed IP (${e}).`
-      );
+      return Promise.reject(`Could not create verified socket, removed IP.`);
     }
   }
 
   async _createVerifiedSocket({ recipient, ip }) {
     console.log('creating verified socket', recipient, ip);
+    let socket;
     try {
       // In the happy flow we have a good IP and connect.
-      const socket = await connectToPeer({ ip });
+      socket = await connectToPeer({ ip });
     } catch (e) {
       console.error(e);
-      return Promise.reject(`Could not create socket to ip. (${e})`);
+      return Promise.reject(`Could not create socket to ip.`);
     }
     return new Promise((resolve, reject) => {
+      console.log('connected to peer, validating key', ip, recipient);
       socket.on('data', data => {
-        if (this._onSocketInitialData(data)) {
-          resolve();
+        if (this._onSocketInitialData({ socket, data })) {
+          resolve(socket);
         } else {
           reject('Could not verify signature.');
         }
@@ -118,12 +115,14 @@ exports.Node = class {
 
   // Registers a socket, assumes it was vetted to actually represent the public key.
   _registerSocket({ publicKey, socket }) {
+    console.log('registering socket', publicKey);
     socket.on('disconnect', () => {
-      delete this._publicKeyToSocket[recipient];
+      delete this._publicKeyToSocket[publicKey];
     });
-    this._publicKeyToSocket[recipient] = socket;
+    this._publicKeyToSocket[publicKey] = socket;
     socket.on('data', data => {
       const message = JSON.parse(data);
+      console.log('received data on the wire', message);
       for (cb of this._messageTypeToSubscribe[message.type]) {
         cb({ publicKey, message });
       }
@@ -131,10 +130,10 @@ exports.Node = class {
   }
 
   // Triggers a search for a public key's IP.
-  _getIp({ recipient }) {
+  _getIp({ publicKey }) {
     const peers = [this._publicKey, ...Object.keys(this._publicKeyToIps)];
     const distances = peers.map(
-      distanceBetweenPublicKeys.bind(null, recipient)
+      distanceBetweenPublicKeys.bind(null, publicKey)
     );
     // Upon a cache miss, query the closest peer for the missing IP.
     const minPeer = peers[distances.indexOf(Math.min(...distances))];
@@ -146,14 +145,14 @@ exports.Node = class {
       {
         recipient: minPeer,
         type: constants.GET_IP,
-        payload: recipient
+        payload: publicKey
       },
       0,
       0
     ).catch(console.log);
   }
 
-  _onSocketInitialData(data) {
+  _onSocketInitialData({ socket, data }) {
     const message = JSON.parse(data);
     console.log('got initial data on socket', message);
     if (
@@ -163,7 +162,7 @@ exports.Node = class {
         signature: message.payload.signature
       })
     ) {
-      this._registerSocket({ publicKey: message.publicKey, socket: c });
+      this._registerSocket({ publicKey: message.payload.publicKey, socket });
       return true;
     }
     return false;
@@ -171,9 +170,12 @@ exports.Node = class {
 
   _createServer() {
     const server = net.createServer(c => {
-      console.log('client has connected, sending credentials');
+      console.log('incoming connection, sending credentials');
+      c.on('data', data => {
+        this._onSocketInitialData({ socket: c, data });
+      });
       // Send the client our identity.
-      c.write(
+      const writeResult = c.write(
         toMessage({
           type: constants.IDENTIFY,
           payload: {
@@ -182,13 +184,12 @@ exports.Node = class {
           }
         })
       );
-      c.on('data', this._onSocketInitialData.bind(this));
     });
     server.on('error', err => {
       throw err;
     });
     server.listen(constants.PORT, () => {
-      console.log(`server bound`);
+      console.log('server bound', server.address());
     });
   }
 
@@ -205,7 +206,7 @@ const distanceBetweenPublicKeys = function({ k1, k2 }) {
 
 const connectToPeer = function({ ip }) {
   return new Promise((resolve, reject) => {
-    console.log('setting up socket', ip);
+    console.log('setting up socket', constants.PORT, ip);
     const socket = net.connect(constants.PORT, ip, () => {
       console.log('connection successful', ip);
       resolve(socket);
@@ -215,7 +216,7 @@ const connectToPeer = function({ ip }) {
 
 // TODO
 const verifySignature = function({ publicKey, signature }) {
-  return True;
+  return true;
 };
 
 // Defines how a message on the network looks like.

@@ -8,6 +8,8 @@ const node = new nodeLib.Node({
 setTimeout(() => {
   node
     .sendMessage({ recipient: 1, type: 'bla', payload: 'hello' }, 3, 1000)
-    .then(console.log)
+    .then(status => {
+      console.log(status ? 'woohoo' : ':(');
+    })
     .catch(console.log);
 }, 2000);
