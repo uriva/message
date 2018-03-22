@@ -99,24 +99,14 @@ exports.Node = class {
 
   async _createVerifiedSocket({ recipient, ip }) {
     console.log('creating verified socket', recipient, ip);
-    let socket;
     try {
       // In the happy flow we have a good IP and connect.
-      socket = await connectToPeer({ ip });
+      const socket = await connectToPeer({ ip });
+      return this._prepareSocket(socket);
     } catch (e) {
       console.error(e);
       return Promise.reject(`Could not create socket to ip.`);
     }
-    return new Promise((resolve, reject) => {
-      console.log('connected to peer, validating key', ip, recipient);
-      socket.on('data', data => {
-        if (this._onSocketInitialData({ socket, data })) {
-          resolve(socket);
-        } else {
-          reject('Could not verify signature.');
-        }
-      });
-    });
   }
 
   // Registers a socket, assumes it was vetted to actually represent the public key.
@@ -130,6 +120,10 @@ exports.Node = class {
     socket.on('data', data => {
       const message = JSON.parse(data);
       console.log('received data on the wire', message);
+      if (!this._messageTypeToSubscribe[message.type]) {
+        console.log('got message but no one to listen on type', message);
+        return;
+      }
       for (cb of this._messageTypeToSubscribe[message.type]) {
         cb({ publicKey, message });
       }
@@ -158,38 +152,50 @@ exports.Node = class {
     ).catch(console.log);
   }
 
-  _onSocketInitialData({ socket, data }) {
-    const message = JSON.parse(data);
-    console.log('got initial data on socket', message);
-    if (
-      message.type == constants.IDENTIFY &&
-      verifySignature({
-        publicKey: message.payload.publicKey,
-        signature: message.payload.signature
+  _prepareSocket(socket) {
+    console.log('handling new socket');
+    // Send the client our identity.
+    console.log('sending own credentials');
+    const writeResult = socket.write(
+      toMessage({
+        type: constants.IDENTIFY,
+        payload: {
+          publicKey: this._publicKey,
+          signature: this._createSignature()
+        }
       })
-    ) {
-      this._registerSocket({ publicKey: message.payload.publicKey, socket });
-      return true;
-    }
-    return false;
+    );
+    console.log('waiting for credentials');
+    return new Promise((resolve, reject) => {
+      const onFirstDataHandler = data => {
+        console.log('got initial data on socket', data.toString());
+        socket.removeListener('data', onFirstDataHandler);
+        const message = JSON.parse(data);
+        if (message.type != constants.IDENTIFY) {
+          console.error('unexepected first message on wire', message);
+          reject('unexpected first message');
+        }
+        if (
+          !verifySignature({
+            publicKey: message.payload.publicKey,
+            signature: message.payload.signature
+          })
+        ) {
+          reject('could not verify signature');
+        }
+        this._registerSocket({
+          publicKey: message.payload.publicKey,
+          socket
+        });
+        resolve(socket);
+      };
+      socket.on('data', onFirstDataHandler);
+    });
   }
 
   _createServer() {
     const server = net.createServer(c => {
-      console.log('incoming connection, sending credentials');
-      c.on('data', data => {
-        this._onSocketInitialData({ socket: c, data });
-      });
-      // Send the client our identity.
-      const writeResult = c.write(
-        toMessage({
-          type: constants.IDENTIFY,
-          payload: {
-            publicKey: this._publicKey,
-            signature: this._createSignature()
-          }
-        })
-      );
+      this._prepareSocket(c);
     });
     server.on('error', err => {
       throw err;
@@ -201,7 +207,7 @@ exports.Node = class {
 
   // TODO
   _createSignature() {
-    return 0;
+    return Math.random();
   }
 };
 
@@ -214,7 +220,6 @@ const connectToPeer = function({ ip }) {
   return new Promise((resolve, reject) => {
     console.log('setting up socket', constants.PORT, ip);
     const socket = net.connect(constants.PORT, ip, () => {
-      console.log('connection successful', ip);
       resolve(socket);
     });
   });

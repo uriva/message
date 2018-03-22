@@ -11,5 +11,5 @@ setTimeout(() => {
     .then(status => {
       console.log(status ? 'woohoo' : ':(');
     })
-    .catch(console.log);
+    .catch(console.error);
 }, 2000);
