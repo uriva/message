@@ -1,15 +1,42 @@
-const args = process.argv.slice(2);
 const nodeLib = require('./node');
-const node = new nodeLib.Node({
-  publicKey: args[0],
-  privateKey: args[1],
-  bootstrapIpMap: { '1': 'localhost' }
-});
-setTimeout(() => {
-  node
-    .sendMessage({ recipient: 1, type: 'bla', payload: 'hello' }, 3, 1000)
-    .then(status => {
-      console.log(status ? 'woohoo' : ':(');
-    })
-    .catch(console.error);
-}, 2000);
+const colors = require('colors');
+
+const test = async function() {
+  const alice = await nodeLib.makeNode({
+    logger: (...args) => {
+      console.log(colors.magenta('Alice'), ...args);
+    },
+    publicKey: 0,
+    privateKey: 0,
+    bootstrapPhysicalAddresses: {},
+    subscriber: console.log
+  });
+  const bob = await nodeLib.makeNode({
+    logger: (...args) => {
+      console.log(colors.yellow('Bob'), ...args);
+    },
+    publicKey: 1,
+    privateKey: 1,
+    bootstrapPhysicalAddresses: {
+      '0': { ip: 'localhost', port: alice._port }
+    },
+    subscriber: console.log
+  });
+  const nodes = [alice, bob];
+  try {
+    const status = await bob.sendMessage(
+      { recipient: 0, type: 'bla', payload: 'hello Alice' },
+      3,
+      1000
+    );
+    console.log(
+      status
+        ? colors.green('sent message')
+        : colors.red('could not send message')
+    );
+  } catch (e) {
+    console.error('some error', e);
+  }
+};
+
+test();
