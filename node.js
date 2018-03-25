@@ -37,11 +37,11 @@ const Node = class {
 
   _handleMessage({ publicKey, message }) {
     if (message.type == constants.SEARCH_PEER) {
+      this._logger('got search peer request', publicKey, message);
       const searchedKey = message.payload.searchedKey;
-      this._logger('got search peer request', publicKey, searchedKey);
-      if (searchedKey in self._publicKeyToPhysicalAddress) {
+      if (searchedKey in this._publicKeyToPhysicalAddress) {
         const payload = {};
-        payload[searchedKey] = self._publicKeyToPhysicalAddress[searchedKey];
+        payload[searchedKey] = this._publicKeyToPhysicalAddress[searchedKey];
         this.sendMessage({
           recipient: publicKey,
           type: constants.UPDATE_PEERS,
@@ -49,9 +49,8 @@ const Node = class {
         });
       }
     } else if (message.type == constants.UPDATE_PEERS) {
-      const peersToUpdate = message.payload;
-      this._logger('got update peers', publicKey, payload);
-      this._publicKeyToPhysicalAddress.extend(peersToUpdate);
+      this._logger('got update peers request', publicKey, message);
+      Object.assign(this._publicKeyToPhysicalAddress, message.payload);
     } else {
       this._externalSubscriber({ publicKey, message });
     }
@@ -71,7 +70,9 @@ const Node = class {
       });
       return promise;
     } catch (e) {
-      console.error('Could not create or use a socket for recipient', e);
+      if (!retriesLeft) {
+        console.error('Could not create or use a socket for recipient', e);
+      }
       delete this._publicKeyToSocket[recipient];
       if (!retriesLeft) {
         return Promise.reject('Could not create a socket for recipient.');
@@ -130,9 +131,11 @@ const Node = class {
   _registerSocket({ publicKey, socket }) {
     this._logger('registering socket', publicKey);
     this._publicKeyToSocket[publicKey] = socket;
-    this._publicKeyToPhysicalAddress[
-      publicKey
-    ] = socket._socket.address().address;
+    const address = socket._socket.address();
+    this._publicKeyToPhysicalAddress[publicKey] = {
+      ip: address.address,
+      port: address.port
+    };
   }
 
   // Triggers a search for a public key's physical address, starting with the closest peer.

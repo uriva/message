@@ -22,10 +22,31 @@ const test = async function() {
     },
     subscriber: (...args) => console.log('bob got message', args)
   });
+  const eve = await nodeLib.makeNode({
+    logger: (...args) => {
+      console.log(colors.blue('Bob'), ...args);
+    },
+    publicKey: 2,
+    privateKey: 2,
+    bootstrapPhysicalAddresses: {
+      '0': { ip: 'localhost', port: alice._port }
+    },
+    subscriber: (...args) => console.log('eve got message', args)
+  });
   const nodes = [alice, bob];
   try {
     await bob.sendMessage(
       { recipient: 0, type: 'bla', payload: 'hello Alice' },
+      3,
+      1000
+    );
+    console.log(colors.green('sent message'));
+  } catch (e) {
+    console.error(colors.red('some error'), e);
+  }
+  try {
+    await eve.sendMessage(
+      { recipient: 1, type: 'bla', payload: 'hello Bob I got your IP from Alice' },
       3,
       1000
     );
