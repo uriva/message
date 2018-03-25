@@ -9,7 +9,7 @@ const test = async function() {
     publicKey: 0,
     privateKey: 0,
     bootstrapPhysicalAddresses: {},
-    subscriber: console.log
+    subscriber: (...args) => console.log('alice got message', args)
   });
   const bob = await nodeLib.makeNode({
     logger: (...args) => {
@@ -20,19 +20,16 @@ const test = async function() {
     bootstrapPhysicalAddresses: {
       '0': { ip: 'localhost', port: alice._port }
     },
-    subscriber: console.log
+    subscriber: (...args) => console.log('bob got message', args)
   });
   const nodes = [alice, bob];
   try {
-    const result = await bob.sendMessage(
+    await bob.sendMessage(
       { recipient: 0, type: 'bla', payload: 'hello Alice' },
       3,
       1000
     );
     console.log(colors.green('sent message'));
-    if (result) {
-      console.log(result);
-    }
   } catch (e) {
     console.error(colors.red('some error'), e);
   }

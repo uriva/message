@@ -177,7 +177,8 @@ const Node = class {
     this._logger('waiting for credentials');
     return new Promise((resolve, reject) => {
       socket.on('message', message => {
-        if (!socket.authenticated) {
+        if (!socket.gotFirstMessage) {
+          socket.gotFirstMessage = true;
           this._logger('got initial data on socket', message);
           if (message.type != constants.IDENTIFY) {
             console.error('unexepected first message on wire', message);
@@ -200,11 +201,12 @@ const Node = class {
             publicKey: message.payload.publicKey,
             socket
           });
+          socket.publicKey = message.payload.publicKey;
           socket.authenticated = true;
           resolve(socket);
-        } else {
-          this._logger('received data on the wire', message, publicKey);
-          this._handleMessage({ publicKey, message });
+        } else if (socket.authenticated) {
+          this._logger('received data on the wire', message, socket.publicKey);
+          this._handleMessage({ publicKey: socket.publicKey, message });
         }
       });
     });
