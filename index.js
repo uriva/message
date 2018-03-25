@@ -24,18 +24,17 @@ const test = async function() {
   });
   const nodes = [alice, bob];
   try {
-    const status = await bob.sendMessage(
+    const result = await bob.sendMessage(
       { recipient: 0, type: 'bla', payload: 'hello Alice' },
       3,
       1000
     );
-    console.log(
-      status
-        ? colors.green('sent message')
-        : colors.red('could not send message')
-    );
+    console.log(colors.green('sent message'));
+    if (result) {
+      console.log(result);
+    }
   } catch (e) {
-    console.error('some error', e);
+    console.error(colors.red('some error'), e);
   }
 };
 

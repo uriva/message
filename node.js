@@ -1,4 +1,5 @@
 const net = require('net');
+const JsonSocket = require('json-socket');
 const Timeout = require('await-timeout');
 const constants = {
   PORT: 9876,
@@ -65,11 +66,15 @@ const Node = class {
   ) {
     try {
       const socket = await this._getSocket({ recipient });
-      return socket.write(toMessage({ type, payload }));
+      const promise = new Promise((resolve, reject) => {
+        socket.sendMessage(toMessage({ type, payload }), resolve);
+      });
+      return promise;
     } catch (e) {
-      console.error('Could not create a socket for recipient', e);
+      console.error('Could not create or use a socket for recipient', e);
+      delete this._publicKeyToSocket[recipient];
       if (!retriesLeft) {
-        return Promise.reject(`Could not create a socket for recipient.`);
+        return Promise.reject('Could not create a socket for recipient.');
       }
       retriesLeft--;
       this._getPhysicalAddress({ publicKey: recipient });
@@ -104,7 +109,7 @@ const Node = class {
     } catch (e) {
       delete this._publicKeyToPhysicalAddress[recipient];
       return Promise.reject(
-        `Could not create verified socket, removed physical address.`
+        'Could not create verified socket, removed physical address.'
       );
     }
   }
@@ -117,23 +122,17 @@ const Node = class {
       return this._prepareSocket(socket);
     } catch (e) {
       console.error('Could not create socket to physical address', e);
-      return Promise.reject(`Could not create socket to physical address.`);
+      return Promise.reject('Could not create socket to physical address.');
     }
   }
 
   // Registers a socket, assumes it was vetted to actually represent the public key.
   _registerSocket({ publicKey, socket }) {
     this._logger('registering socket', publicKey);
-    socket.on('disconnect', () => {
-      delete this._publicKeyToSocket[publicKey];
-    });
     this._publicKeyToSocket[publicKey] = socket;
-    this._publicKeyToPhysicalAddress[publicKey] = socket.address().address;
-    socket.on('data', data => {
-      const message = JSON.parse(data);
-      this._logger('received data on the wire', message, publicKey);
-      this._handleMessage({ publicKey, message });
-    });
+    this._publicKeyToPhysicalAddress[
+      publicKey
+    ] = socket._socket.address().address;
   }
 
   // Triggers a search for a public key's physical address, starting with the closest peer.
@@ -166,7 +165,7 @@ const Node = class {
     this._logger('handling new socket');
     // Send the client our identity.
     this._logger('sending own credentials');
-    const writeResult = socket.write(
+    const writeResult = socket.sendMessage(
       toMessage({
         type: constants.IDENTIFY,
         payload: {
@@ -177,30 +176,37 @@ const Node = class {
     );
     this._logger('waiting for credentials');
     return new Promise((resolve, reject) => {
-      const onFirstDataHandler = data => {
-        socket.removeListener('data', onFirstDataHandler);
-        const message = JSON.parse(data);
-        this._logger('got initial data on socket', message);
-        if (message.type != constants.IDENTIFY) {
-          console.error('unexepected first message on wire', message);
-          reject('unexpected first message');
-        }
-        if (
-          !verifySignature({
+      socket.on('message', message => {
+        if (!socket.authenticated) {
+          this._logger('got initial data on socket', message);
+          if (message.type != constants.IDENTIFY) {
+            console.error('unexepected first message on wire', message);
+            reject('unexpected first message');
+            return;
+          }
+          if (
+            !verifySignature({
+              publicKey: message.payload.publicKey,
+              signature: message.payload.signature,
+              app: this._app
+            })
+          ) {
+            reject('could not verify signature');
+            socket.on('message', () => {});
+            return;
+          }
+          this._logger('verified signature');
+          this._registerSocket({
             publicKey: message.payload.publicKey,
-            signature: message.payload.signature,
-            app: this._app
-          })
-        ) {
-          reject('could not verify signature');
+            socket
+          });
+          socket.authenticated = true;
+          resolve(socket);
+        } else {
+          this._logger('received data on the wire', message, publicKey);
+          this._handleMessage({ publicKey, message });
         }
-        this._registerSocket({
-          publicKey: message.payload.publicKey,
-          socket
-        });
-        resolve(socket);
-      };
-      socket.on('data', onFirstDataHandler);
+      });
     });
   }
 
@@ -208,7 +214,7 @@ const Node = class {
     return new Promise((resolve, reject) => {
       this._logger('binding server...');
       const server = net.createServer(c => {
-        this._prepareSocket(c);
+        this._prepareSocket(new JsonSocket(c));
       });
       server.on('error', err => {
         console.error('error while binding server', err);
@@ -227,14 +233,14 @@ const Node = class {
     return new Promise((resolve, reject) => {
       this._logger('setting up socket', ip, port);
       const socket = net.connect(port, ip, () => {
-        resolve(socket);
+        resolve(new JsonSocket(socket));
       });
     });
   }
 
   // TODO
   _createSignature() {
-    return Math.random();
+    return this._publicKey + 1;
   }
 };
 
@@ -245,10 +251,10 @@ const distanceBetweenPublicKeys = function({ k1, k2 }) {
 
 // TODO
 const verifySignature = function({ publicKey, signature, app }) {
-  return true;
+  return publicKey + 1 == signature;
 };
 
 // Defines how a message on the network looks like.
 const toMessage = function({ type, payload }) {
-  return JSON.stringify({ type, payload });
+  return { type, payload };
 };
