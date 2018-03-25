@@ -1,6 +1,6 @@
 # Overcom
 
-P2P JSON passing using DHT that maps public key to physical addresses (IP+port).
+P2P JSON passing using DHT that maps public key and app ID to physical address (IP+port).
 
 ## Applications
 
