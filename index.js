@@ -46,7 +46,11 @@ const test = async function() {
   }
   try {
     await eve.sendMessage(
-      { recipient: 1, type: 'bla', payload: 'hello Bob I got your IP from Alice' },
+      {
+        recipient: 1,
+        type: 'bla',
+        payload: 'hello Bob I got your IP from Alice'
+      },
       3,
       1000
     );
