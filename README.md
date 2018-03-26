@@ -19,61 +19,115 @@ Note that this authentication cannot be revoked, as so in theory a malicious app
 ## Example
 
 Alice binding server...
+
 Alice server bound { address: '::', family: 'IPv6', port: 43769 }
+
 Bob binding server...
+
 Bob server bound { address: '::', family: 'IPv6', port: 46559 }
+
 Eve binding server...
+
 Eve server bound { address: '::', family: 'IPv6', port: 37429 }
+
 Bob getting socket 000
+
 Bob current physical addresses { '000': { ip: 'localhost', port: 43769 } }
+
 Bob creating verified socket { ip: 'localhost', port: 43769 }
+
 Bob setting up socket localhost 43769
+
 Alice handling new socket
+
 Alice sending own credentials
+
 Alice waiting for credentials
+
 Bob handling new socket
+
 Bob sending own credentials
+
 Bob waiting for credentials
+
 Bob verified signature
+
 Bob registering socket 000
+
 sent message
+
 Eve getting socket 001
+
 Eve current physical addresses { '000': { ip: 'localhost', port: 43769 } }
+
 Eve getting socket 000
+
 Eve current physical addresses { '000': { ip: 'localhost', port: 43769 } }
+
 Eve creating verified socket { ip: 'localhost', port: 43769 }
+
 Eve setting up socket localhost 43769
+
 Alice verified signature
+
 Alice registering socket 001
-alice got message [ { publicKey: '001',
-    message: { type: 'bla', payload: 'hello Alice' } } ]
+
+alice got message [ { publicKey: '001', message: { type: 'bla', payload: 'hello Alice' } } ]
+    
 Alice handling new socket
+
 Alice sending own credentials
+
 Alice waiting for credentials
+
 Eve handling new socket
+
 Eve sending own credentials
+
 Eve waiting for credentials
+
 Eve verified signature
+
 Eve registering socket 000
+
 Alice verified signature
+
 Alice registering socket 111
+
 Alice got search peer request 001
+
 Alice getting socket 001
+
 Bob got search peer request 001
+
 Bob peer wants my physical address
+
 Bob creating verified socket { ip: '::', port: 37429 }
+
 Bob setting up socket :: 37429
+
 Eve handling new socket
+
 Eve sending own credentials
+
 Eve waiting for credentials
+
 Bob handling new socket
+
 Bob sending own credentials
+
 Bob waiting for credentials
+
 Bob verified signature
+
 Bob registering socket 111
+
 Eve verified signature
+
 Eve registering socket 001
+
 Eve getting socket 001
+
 sent message
-bob got message [ { publicKey: '111',
-    message: { type: 'bla', payload: 'hello Bob I got your IP from Alice' } } ]
+
+bob got message [ { publicKey: '111', message: { type: 'bla', payload: 'hello Bob I got your IP from Alice' } } ]
