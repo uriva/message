@@ -18,6 +18,12 @@ Note that this authentication cannot be revoked, as so in theory a malicious app
 
 ## Example
 
+Alice publickey is 000
+
+Bob publickey is 001
+
+Eve publickey is 111
+
 Alice binding server...
 
 Alice server bound { address: '::', family: 'IPv6', port: 43769 }
