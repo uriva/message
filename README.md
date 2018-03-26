@@ -24,15 +24,9 @@ Bob publickey is 001
 
 Eve publickey is 111
 
-Alice binding server...
-
 Alice server bound { address: '::', family: 'IPv6', port: 43769 }
 
-Bob binding server...
-
 Bob server bound { address: '::', family: 'IPv6', port: 46559 }
-
-Eve binding server...
 
 Eve server bound { address: '::', family: 'IPv6', port: 37429 }
 
