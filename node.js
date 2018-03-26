@@ -2,10 +2,7 @@ const net = require('net');
 const JsonSocket = require('json-socket');
 const Timeout = require('await-timeout');
 const constants = {
-  PORT: 9876,
-  GET_PHYSICAL_ADDRESS: 'GET_PHYSICAL_ADDRESS',
   IDENTIFY: 'IDENTIFY',
-  UPDATE_PEERS: 'UPDATE_PEERS',
   SEARCH_PEER: 'SEARCH_PEER'
 };
 
@@ -37,20 +34,20 @@ const Node = class {
 
   _handleMessage({ publicKey, message }) {
     if (message.type == constants.SEARCH_PEER) {
-      this._logger('got search peer request', publicKey, message);
       const searchedKey = message.payload.searchedKey;
-      if (searchedKey in this._publicKeyToPhysicalAddress) {
-        const payload = {};
-        payload[searchedKey] = this._publicKeyToPhysicalAddress[searchedKey];
-        this.sendMessage({
-          recipient: publicKey,
-          type: constants.UPDATE_PEERS,
-          payload
+      this._logger('got search peer request', searchedKey);
+      const physicalAddress = message.payload.physicalAddress;
+      if (searchedKey == this._publicKey) {
+        this._logger('peer wants my physical address');
+        this._createVerifiedSocket({
+          physicalAddress
+        });
+      } else {
+        this._sendSearchRequest({
+          publicKey: searchedKey,
+          physicalAddress
         });
       }
-    } else if (message.type == constants.UPDATE_PEERS) {
-      this._logger('got update peers request', publicKey, message);
-      Object.assign(this._publicKeyToPhysicalAddress, message.payload);
     } else {
       this._externalSubscriber({ publicKey, message });
     }
@@ -78,7 +75,11 @@ const Node = class {
         return Promise.reject('Could not create a socket for recipient.');
       }
       retriesLeft--;
-      this._getPhysicalAddress({ publicKey: recipient });
+      this._sendSearchRequest({
+        publicKey: recipient,
+        // TODO: would have been good to encrypt this, but can't decrypt with secondary key.
+        physicalAddress: { ip: this._ip, port: this._port }
+      });
       const timeout = new Timeout();
       await timeout.set(waitBetweenRetries);
       return this.sendMessage(
@@ -104,7 +105,6 @@ const Node = class {
     }
     try {
       return await this._createVerifiedSocket({
-        recipient,
         physicalAddress: this._publicKeyToPhysicalAddress[recipient]
       });
     } catch (e) {
@@ -115,8 +115,8 @@ const Node = class {
     }
   }
 
-  async _createVerifiedSocket({ recipient, physicalAddress }) {
-    this._logger('creating verified socket', recipient, physicalAddress);
+  async _createVerifiedSocket({ physicalAddress }) {
+    this._logger('creating verified socket', physicalAddress);
     try {
       // In the happy flow we have a good physical address and connect.
       const socket = await this._connectToPeer(physicalAddress);
@@ -139,22 +139,28 @@ const Node = class {
   }
 
   // Triggers a search for a public key's physical address, starting with the closest peer.
-  _getPhysicalAddress({ publicKey }) {
-    const peers = [...Object.keys(this._publicKeyToPhysicalAddress)];
-    if (!peers.length) {
-      console.error('No peers to query.');
-      return;
-    }
+  _sendSearchRequest({ publicKey, physicalAddress }) {
+    const peers = [
+      this._publicKey,
+      ...Object.keys(this._publicKeyToPhysicalAddress)
+    ];
     const distances = peers.map(
       distanceBetweenPublicKeys.bind(null, publicKey)
     );
     const minPeer = peers[distances.indexOf(Math.min(...distances))];
+    if (minPeer == this._publicKey) {
+      console.error('No peers to query.');
+      return;
+    }
     try {
       this.sendMessage(
         {
           recipient: minPeer,
           type: constants.SEARCH_PEER,
-          payload: { searchedKey: publicKey }
+          payload: {
+            searchedKey: publicKey,
+            physicalAddress
+          }
         },
         0,
         0
@@ -182,7 +188,7 @@ const Node = class {
       socket.on('message', message => {
         if (!socket.gotFirstMessage) {
           socket.gotFirstMessage = true;
-          this._logger('got initial data on socket', message);
+          // this._logger('got initial data on socket', message);
           if (message.type != constants.IDENTIFY) {
             console.error('unexepected first message on wire', message);
             reject('unexpected first message');
@@ -208,7 +214,7 @@ const Node = class {
           socket.authenticated = true;
           resolve(socket);
         } else if (socket.authenticated) {
-          this._logger('received data on the wire', message, socket.publicKey);
+          // this._logger('received data on the wire', message, socket.publicKey);
           this._handleMessage({ publicKey: socket.publicKey, message });
         }
       });
@@ -228,6 +234,7 @@ const Node = class {
       server.listen(null, () => {
         const address = server.address();
         this._logger('server bound', address);
+        this._ip = address.address;
         this._port = address.port;
         resolve();
       });
@@ -245,18 +252,23 @@ const Node = class {
 
   // TODO
   _createSignature() {
-    return this._publicKey + 1;
+    return 'sigfor' + this._publicKey;
   }
 };
 
-// TODO
-const distanceBetweenPublicKeys = function({ k1, k2 }) {
-  return 1;
+const distanceBetweenPublicKeys = function(k1, k2) {
+  let delta = 0;
+  for (i = 0; i < k1.length; i++) {
+    if (k1[i] != k2[i]) {
+      delta += 1;
+    }
+  }
+  return delta;
 };
 
 // TODO
 const verifySignature = function({ publicKey, signature, app }) {
-  return publicKey + 1 == signature;
+  return true;
 };
 
 // Defines how a message on the network looks like.

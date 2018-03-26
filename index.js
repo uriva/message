@@ -6,8 +6,8 @@ const test = async function() {
     logger: (...args) => {
       console.log(colors.magenta('Alice'), ...args);
     },
-    publicKey: 0,
-    privateKey: 0,
+    publicKey: '000',
+    privateKey: '0',
     bootstrapPhysicalAddresses: {},
     subscriber: (...args) => console.log('alice got message', args)
   });
@@ -15,28 +15,28 @@ const test = async function() {
     logger: (...args) => {
       console.log(colors.yellow('Bob'), ...args);
     },
-    publicKey: 1,
-    privateKey: 1,
+    publicKey: '001',
+    privateKey: '1',
     bootstrapPhysicalAddresses: {
-      '0': { ip: 'localhost', port: alice._port }
+      '000': { ip: 'localhost', port: alice._port }
     },
     subscriber: (...args) => console.log('bob got message', args)
   });
   const eve = await nodeLib.makeNode({
     logger: (...args) => {
-      console.log(colors.blue('Bob'), ...args);
+      console.log(colors.blue('Eve'), ...args);
     },
-    publicKey: 2,
-    privateKey: 2,
+    publicKey: '111',
+    privateKey: '2',
     bootstrapPhysicalAddresses: {
-      '0': { ip: 'localhost', port: alice._port }
+      '000': { ip: 'localhost', port: alice._port }
     },
     subscriber: (...args) => console.log('eve got message', args)
   });
   const nodes = [alice, bob];
   try {
     await bob.sendMessage(
-      { recipient: 0, type: 'bla', payload: 'hello Alice' },
+      { recipient: '000', type: 'bla', payload: 'hello Alice' },
       3,
       1000
     );
@@ -47,7 +47,7 @@ const test = async function() {
   try {
     await eve.sendMessage(
       {
-        recipient: 1,
+        recipient: '001',
         type: 'bla',
         payload: 'hello Bob I got your IP from Alice'
       },
