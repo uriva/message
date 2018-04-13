@@ -1,4 +1,4 @@
-const nodeLib = require('./node');
+const nodeLib = require('./index');
 const colors = require('colors');
 
 const test = async function() {
