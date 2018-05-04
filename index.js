@@ -13,7 +13,6 @@ exports.makeNode = async function(args) {
 };
 
 const Node = class {
-  // All param are strings.
   // See README for what the private key is.
   constructor({
     logger,
@@ -21,8 +20,11 @@ const Node = class {
     privateKey,
     app,
     bootstrapPhysicalAddresses,
-    subscriber
+    subscriber,
+    // Can be null (then port will be random).
+    listenPort
   }) {
+    this._listenPort = listenPort;
     this._logger = logger;
     this._publicKey = publicKey;
     this._app = app;
@@ -235,7 +237,7 @@ const Node = class {
         console.error('error while binding server', err);
         reject();
       });
-      server.listen(null, () => {
+      server.listen(this._listenPort, () => {
         const address = server.address();
         this._logger('server bound', address);
         this._ip = address.address;

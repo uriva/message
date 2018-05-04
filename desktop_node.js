@@ -5,5 +5,6 @@ makeNode({
   privateKey: '1',
   app: '0',
   bootstrapPhysicalAddresses: {},
-  subscriber: console.log
+  subscriber: console.log,
+  listenPort: '43585'
 });
