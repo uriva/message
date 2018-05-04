@@ -149,7 +149,11 @@ const Node = class {
     );
     const minPeer = peers[distances.indexOf(Math.min(...distances))];
     if (minPeer == this._publicKey) {
-      console.error('No peers to query.');
+      console.error(
+        `closest peer is self (${
+          this._publicKey
+        }) so no peers to query about physical address of ${publicKey}.`
+      );
       return;
     }
     try {
