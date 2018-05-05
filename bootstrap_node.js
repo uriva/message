@@ -6,5 +6,5 @@ makeNode({
   app: '0',
   bootstrapPhysicalAddresses: {},
   subscriber: console.log,
-  listenPort: '43585'
+  listenPort: process.env.PORT
 });
