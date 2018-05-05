@@ -1,6 +1,7 @@
 const net = require('net');
 const JsonSocket = require('json-socket');
 const Timeout = require('await-timeout');
+const ngrok = require('ngrok');
 const constants = {
   IDENTIFY: 'IDENTIFY',
   SEARCH_PEER: 'SEARCH_PEER'
@@ -20,11 +21,8 @@ const Node = class {
     privateKey,
     app,
     bootstrapPhysicalAddresses,
-    subscriber,
-    // Can be null (then port will be random).
-    listenPort
+    subscriber
   }) {
-    this._listenPort = listenPort;
     this._logger = logger;
     this._publicKey = publicKey;
     this._app = app;
@@ -80,7 +78,7 @@ const Node = class {
       this._sendSearchRequest({
         publicKey: recipient,
         // TODO: would have been good to encrypt this, but can't decrypt with secondary key.
-        physicalAddress: { ip: this._ip, port: this._port }
+        physicalAddress: { ip: this._publicIp, port: this._publicPort }
       });
       const timeout = new Timeout();
       await timeout.set(waitBetweenRetries);
@@ -237,12 +235,22 @@ const Node = class {
         console.error('error while binding server', err);
         reject();
       });
-      server.listen(this._listenPort, () => {
+      server.listen(null, async () => {
         const address = server.address();
         this._logger('server bound', address);
-        this._ip = address.address;
-        this._port = address.port;
-        resolve();
+        try {
+          await ngrok.authtoken('3ApnVFTaFGJg12z6BgJqk_24gVyKQRaeaXzd64R9duY');
+          const url = await ngrok.connect({ proto: 'tcp', addr: address.port });
+          console.log(url);
+          this._logger(`public tunnel url: ${url}`);
+          const parts = url.split(':');
+          this._publicIp = parts[1].slice(2);
+          this._publicPort = parts[2];
+          resolve();
+        } catch (e) {
+          console.error(e);
+          reject();
+        }
       });
     });
   }
