@@ -1,7 +1,8 @@
 const net = require('net');
 const JsonSocket = require('json-socket');
 const Timeout = require('await-timeout');
-const ngrok = require('ngrok');
+const natUpnp = require('nat-upnp');
+const natUpnpClient = natUpnp.createClient();
 const constants = {
   IDENTIFY: 'IDENTIFY',
   SEARCH_PEER: 'SEARCH_PEER'
@@ -228,6 +229,13 @@ const Node = class {
   createServer() {
     return new Promise((resolve, reject) => {
       this._logger('binding server...');
+      natUpnpClient.externalIp((error, ip) => {
+        if (error) {
+          console.error(error);
+        } else {
+          this._publicIp = ip;
+        }
+      });
       const server = net.createServer(c => {
         this._prepareSocket(new JsonSocket(c));
       });
@@ -238,19 +246,27 @@ const Node = class {
       server.listen(null, async () => {
         const address = server.address();
         this._logger('server bound', address);
-        try {
-          await ngrok.authtoken('3ApnVFTaFGJg12z6BgJqk_24gVyKQRaeaXzd64R9duY');
-          const url = await ngrok.connect({ proto: 'tcp', addr: address.port });
-          console.log(url);
-          this._logger(`public tunnel url: ${url}`);
-          const parts = url.split(':');
-          this._publicIp = parts[1].slice(2);
-          this._publicPort = parts[2];
-          resolve();
-        } catch (e) {
-          console.error(e);
-          reject();
-        }
+        natUpnpClient.portMapping(
+          {
+            public: address.port,
+            private: address.port,
+            ttl: 10
+          },
+          err => {
+            if (err) {
+              console.error(err);
+            } else {
+              this._publicPort = address.port;
+              this._logger(
+                'external port bound',
+                this._publicIp,
+                this._publicPort
+              );
+              resolve();
+            }
+          }
+        );
+        resolve();
       });
     });
   }

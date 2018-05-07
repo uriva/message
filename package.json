@@ -13,7 +13,7 @@
     "await-timeout": "^0.2.0",
     "colors": "^1.2.1",
     "json-socket": "^0.3.0",
-    "ngrok": "^3.0.1",
+    "nat-upnp": "^1.1.1",
     "random-port": "^0.1.0"
   }
 }
